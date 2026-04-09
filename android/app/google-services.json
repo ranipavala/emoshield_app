@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1083546212926",
+    "project_id": "emoshield-f9dfc",
+    "storage_bucket": "emoshield-f9dfc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1083546212926:android:351b491b01e725857d8f6f",
+        "android_client_info": {
+          "package_name": "com.example.emoshield_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnmfQ_Dbdt6zpbW-ezWVKI0A4_ZyfAfGQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
