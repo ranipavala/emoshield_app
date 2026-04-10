@@ -106,7 +106,7 @@ class LevelResultScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '${progress.totalScore}/6',
+                                  '${progress.totalScore}/3',
                                   style: const TextStyle(
                                     fontSize: 34,
                                     fontWeight: FontWeight.w900,
@@ -128,7 +128,7 @@ class LevelResultScreen extends StatelessWidget {
                           child: Column(
                             children: gameLabels.entries.map((entry) {
                               final score = progress.gameScores[entry.key] ?? 0;
-                              final maxScore = entry.key == 'shape_match' ? 4 : 1;
+                              const maxScore = 1;
 
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 10),

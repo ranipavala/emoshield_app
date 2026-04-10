@@ -34,13 +34,19 @@ class _PatternRecognitionGameScreenState
 
     setState(() => _isSaving = true);
 
-    final score = _selectedOption == 1 ? 1 : 0;
+    final selectedLabel = _selectedOption == null ? '' : _patternOptions[_selectedOption!].label;
+    const correctLabel = 'Pink circle';
+    final score = selectedLabel == correctLabel ? 1 : 0;
 
     await _progressService.saveGameResult(
       childId: widget.childId,
       gameIndex: 2,
       gameKey: 'pattern_recognition',
+      selectedAnswer: selectedLabel,
+      correctAnswer: correctLabel,
       score: score,
+      gameTitle: 'Pattern Recognition Game',
+      totalQuestions: 1,
     );
 
     if (!mounted) {

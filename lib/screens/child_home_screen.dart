@@ -4,13 +4,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../app/app_router.dart';
 import 'parent_home_screen.dart';
+import 'games_screen.dart';
+import 'progress_report_screen.dart';
 
 class ChildHomeScreen extends StatelessWidget {
+  final String childId;
   final String childName;
   final String? avatarAsset;
 
   const ChildHomeScreen({
     super.key,
+    required this.childId,
     required this.childName,
     this.avatarAsset,
   });
@@ -247,7 +251,15 @@ class ChildHomeScreen extends StatelessWidget {
                           'Solve fun puzzles\nwhile EmoShield\nevaluates your\nprogress.',
                       buttonText: 'Play Now',
                       onPressed: () =>
-                          Navigator.pushNamed(context, AppRouter.games),
+                          Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => GamesScreen(
+                            childId: childId,
+                            childName: childName,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -260,9 +272,15 @@ class ChildHomeScreen extends StatelessWidget {
                       subtitle:
                           'See your progress\nas of now, and\nlearn from there.',
                       buttonText: 'View Now',
-                      onPressed: () => Navigator.pushNamed(
+                      onPressed: () => Navigator.push(
                         context,
-                        AppRouter.progressReport,
+                        MaterialPageRoute(
+                          builder: (_) => ProgressReportScreen(
+                            childId: childId,
+                            childName: childName,
+                            isChildView: true,
+                          ),
+                        ),
                       ),
                     ),
                   ),
