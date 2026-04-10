@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/game_progress_service.dart';
 import '../widgets/game_level_scaffold.dart';
-import 'reasoning_choice_game_screen.dart';
+import 'level_result_screen.dart';
 
 class Level2CategorySortingGameScreen extends StatefulWidget {
   final String childId;
@@ -15,54 +15,44 @@ class Level2CategorySortingGameScreen extends StatefulWidget {
   });
 
   @override
-  State<Level2CategorySortingGameScreen> createState() => _Level2CategorySortingGameScreenState();
+  State<Level2CategorySortingGameScreen> createState() =>
+      _Level2CategorySortingGameScreenState();
 }
 
-class _Level2CategorySortingGameScreenState extends State<Level2CategorySortingGameScreen> {
-  final _service = const GameProgressService();
+class _Level2CategorySortingGameScreenState
+    extends State<Level2CategorySortingGameScreen> {
+  final _progressService = const GameProgressService();
 
   String? _selectedCategory;
-  bool _saving = false;
+  bool _isSaving = false;
 
-  Future<void> _finish() async {
-    if (_selectedCategory == null || _saving) return;
-    setState(() => _saving = true);
+  Future<void> _finishGame() async {
+    if (_selectedCategory == null || _isSaving) return;
 
-    const correct = 'Fruits';
-    final score = _selectedCategory == correct ? 1 : 0;
+    setState(() => _isSaving = true);
 
-    await _service.saveGameResult(
+    const correctCategory = 'Fruits';
+    final score = _selectedCategory == correctCategory ? 1 : 0;
+
+    await _progressService.saveGameResult(
       childId: widget.childId,
-      levelNumber: 2,
       gameIndex: 1,
       gameKey: 'category_sorting',
       selectedAnswer: _selectedCategory!,
-      correctAnswer: correct,
+      correctAnswer: correctCategory,
       score: score,
       gameTitle: 'Category Sorting Game',
       totalQuestions: 1,
     );
 
     if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
+
+    Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => ReasoningChoiceGameScreen(
+        builder: (_) => LevelResultScreen(
           childId: widget.childId,
           childName: widget.childName,
           levelNumber: 2,
-          gameIndex: 2,
-          gameKey: 'picture_logic',
-          gameTitle: 'Picture Logic Game',
-          question: 'Which picture best completes the pattern?',
-          prompt: '🌞 🌧 🌞 ?',
-          options: const ['🌧', '🌙', '⭐', '☁'],
-          correctAnswer: '🌧',
-          nextRoute: LevelResultScreen(
-            childId: widget.childId,
-            childName: widget.childName,
-            levelNumber: 2,
-          ),
         ),
       ),
     );
@@ -72,20 +62,20 @@ class _Level2CategorySortingGameScreenState extends State<Level2CategorySortingG
   Widget build(BuildContext context) {
     return GameLevelScaffold(
       question: 'Tap the correct category for 🍎',
-      helperText: 'Choose one category.',
+      helperText: 'Choose the best matching category.',
       onBackPressed: () => Navigator.pop(context),
-      onFinishPressed: _finish,
-      finishEnabled: _selectedCategory != null && !_saving,
+      onFinishPressed: _finishGame,
+      finishEnabled: _selectedCategory != null && !_isSaving,
       child: Column(
         children: [
           const Text('🍎', style: TextStyle(fontSize: 80)),
-          const SizedBox(height: 16),
-          ...['Animals', 'Fruits', 'Vehicles', 'Shapes'].map((cat) {
-            final selected = _selectedCategory == cat;
+          const SizedBox(height: 20),
+          ...['Animals', 'Fruits', 'Vehicles', 'Shapes'].map((category) {
+            final isSelected = _selectedCategory == category;
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: InkWell(
-                onTap: () => setState(() => _selectedCategory = cat),
+                onTap: () => setState(() => _selectedCategory = category),
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
@@ -93,15 +83,23 @@ class _Level2CategorySortingGameScreenState extends State<Level2CategorySortingG
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: selected ? const Color(0xFF2F86D6) : Colors.transparent,
+                      color: isSelected
+                          ? const Color(0xFF2F86D6)
+                          : Colors.transparent,
                       width: 3,
                     ),
                   ),
-                  child: Text(cat, style: const TextStyle(fontWeight: FontWeight.w800)),
+                  child: Text(
+                    category,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 17,
+                    ),
+                  ),
                 ),
               ),
             );
-          }),
+          }).toList(),
         ],
       ),
     );
