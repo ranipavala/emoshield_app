@@ -36,6 +36,7 @@ class _Level2CategorySortingGameScreenState
 
     await _progressService.saveGameResult(
       childId: widget.childId,
+      levelNumber: 2,
       gameIndex: 1,
       gameKey: 'category_sorting',
       selectedAnswer: _selectedCategory!,
