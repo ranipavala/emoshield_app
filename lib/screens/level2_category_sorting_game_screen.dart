@@ -36,6 +36,7 @@ class _Level2CategorySortingGameScreenState
 
     await _progressService.saveGameResult(
       childId: widget.childId,
+      levelNumber: 2,
       gameIndex: 1,
       gameKey: 'category_sorting',
       selectedAnswer: _selectedCategory!,
@@ -60,6 +61,8 @@ class _Level2CategorySortingGameScreenState
 
   @override
   Widget build(BuildContext context) {
+    const categories = ['Animals', 'Fruits', 'Vehicles', 'Shapes'];
+
     return GameLevelScaffold(
       question: 'Tap the correct category for 🍎',
       helperText: 'Choose the best matching category.',
@@ -70,9 +73,8 @@ class _Level2CategorySortingGameScreenState
         children: [
           const Text('🍎', style: TextStyle(fontSize: 80)),
           const SizedBox(height: 20),
-          ...['Animals', 'Fruits', 'Vehicles', 'Shapes'].map((category) {
-            final isSelected = _selectedCategory == category;
-            return Padding(
+          for (final category in categories)
+            Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: InkWell(
                 onTap: () => setState(() => _selectedCategory = category),
@@ -83,7 +85,7 @@ class _Level2CategorySortingGameScreenState
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: isSelected
+                      color: _selectedCategory == category
                           ? const Color(0xFF2F86D6)
                           : Colors.transparent,
                       width: 3,
@@ -98,8 +100,7 @@ class _Level2CategorySortingGameScreenState
                   ),
                 ),
               ),
-            );
-          }).toList(),
+            ),
         ],
       ),
     );

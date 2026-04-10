@@ -15,7 +15,7 @@ class LevelResultScreen extends StatelessWidget {
     super.key,
     required this.childId,
     required this.childName,
-    this.levelNumber = 1,
+    required this.levelNumber,
   });
 
   Future<LevelProgress> _loadProgress() async {
