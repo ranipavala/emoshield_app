@@ -38,7 +38,6 @@ class _PatternRecognitionGameScreenState
 
     await _progressService.saveGameResult(
       childId: widget.childId,
-      levelNumber: 1,
       gameIndex: 2,
       gameKey: 'pattern_recognition',
       selectedAnswer: selectedLabel,
@@ -83,8 +82,10 @@ class _PatternRecognitionGameScreenState
       finishEnabled: _selectedOption != null && !_isSaving,
       child: Column(
         children: [
-          const Text('🔴 🔵 🔴 ?',
-              style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900)),
+          const Text(
+            '🔴 🔵 🔴 ?',
+            style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900),
+          ),
           const SizedBox(height: 18),
           Expanded(
             child: ListView.separated(
@@ -102,13 +103,18 @@ class _PatternRecognitionGameScreenState
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: isSelected ? const Color(0xFF2F86D6) : Colors.transparent,
+                        color: isSelected
+                            ? const Color(0xFF2F86D6)
+                            : Colors.transparent,
                         width: 3,
                       ),
                     ),
                     child: Text(
                       option.label,
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                      ),
                     ),
                   ),
                 );
