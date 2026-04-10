@@ -35,13 +35,19 @@ class ProgressReportService {
   }
 
   Future<Map<String, dynamic>?> loadLevelProgress(String childId) async {
-    final snapshot = await _childrenRef()
-        .doc(childId)
-        .collection('gameProgress')
-        .doc('level_1')
-        .get();
+    // Prefer highest available completed/in-progress level
+    for (final levelId in ['level_3', 'level_2', 'level_1']) {
+      final snapshot = await _childrenRef()
+          .doc(childId)
+          .collection('gameProgress')
+          .doc(levelId)
+          .get();
 
-    return snapshot.data();
+      if (snapshot.exists && snapshot.data() != null) {
+        return snapshot.data();
+      }
+    }
+    return null;
   }
 
   Future<List<GameSession>> loadRecentSessions(String childId) async {
@@ -49,7 +55,7 @@ class ProgressReportService {
         .doc(childId)
         .collection('gameSessions')
         .orderBy('playedAt', descending: true)
-        .limit(20)
+        .limit(30)
         .get();
 
     return snapshot.docs.map(GameSession.fromDoc).toList();

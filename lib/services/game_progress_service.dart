@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../models/level_catalog.dart';
 import '../models/level_progress.dart';
 
 class GameProgressService {
@@ -22,23 +23,32 @@ class GameProgressService {
         .doc(childId);
   }
 
-  DocumentReference<Map<String, dynamic>> _levelRef(String childId) {
-    return _childRef(childId).collection('gameProgress').doc(LevelProgress.levelId);
+  DocumentReference<Map<String, dynamic>> _levelRef({
+    required String childId,
+    required int levelNumber,
+  }) {
+    return _childRef(childId)
+        .collection('gameProgress')
+        .doc(LevelCatalog.levelId(levelNumber));
   }
 
   CollectionReference<Map<String, dynamic>> _sessionsRef(String childId) {
     return _childRef(childId).collection('gameSessions');
   }
 
-  Future<LevelProgress> ensureLevelOneProgress(String childId) async {
-    final ref = _levelRef(childId);
+  Future<LevelProgress> ensureLevelProgress({
+    required String childId,
+    required int levelNumber,
+  }) async {
+    final totalGames = LevelCatalog.totalGames(levelNumber);
+    final ref = _levelRef(childId: childId, levelNumber: levelNumber);
     final snapshot = await ref.get();
 
     if (!snapshot.exists) {
       final initial = LevelProgress.initial();
       await ref.set({
-        'levelNumber': 1,
-        'currentLevel': 1,
+        'levelNumber': levelNumber,
+        'currentLevel': levelNumber,
         'currentGameIndex': initial.currentGameIndex,
         'completedGameIndices': initial.completedGameIndices,
         'completedGames': initial.completedGameIndices,
@@ -49,20 +59,26 @@ class GameProgressService {
         'totalScore': initial.totalScore,
         'updatedAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
-      });
+        'totalGames': totalGames,
+      }, SetOptions(merge: true));
       return initial;
     }
 
     return LevelProgress.fromMap(snapshot.data());
   }
 
-  Future<LevelProgress> loadLevelOneProgress(String childId) async {
-    final snapshot = await _levelRef(childId).get();
+  Future<LevelProgress> loadLevelProgress({
+    required String childId,
+    required int levelNumber,
+  }) async {
+    final snapshot =
+        await _levelRef(childId: childId, levelNumber: levelNumber).get();
     return LevelProgress.fromMap(snapshot.data());
   }
 
   Future<void> saveGameResult({
     required String childId,
+    required int levelNumber,
     required int gameIndex,
     required String gameKey,
     required String selectedAnswer,
@@ -71,20 +87,28 @@ class GameProgressService {
     required String gameTitle,
     required int totalQuestions,
   }) async {
-    final ref = _levelRef(childId);
-    final current = await ensureLevelOneProgress(childId);
+    final totalGames = LevelCatalog.totalGames(levelNumber);
+    final ref = _levelRef(childId: childId, levelNumber: levelNumber);
+    final current = await ensureLevelProgress(
+      childId: childId,
+      levelNumber: levelNumber,
+    );
 
     final completed = {...current.completedGameIndices, gameIndex}.toList()..sort();
     final scores = Map<String, int>.from(current.gameScores)..[gameKey] = score;
-    final isCompleted = completed.length >= LevelProgress.totalGames;
-    final nextGameIndex = isCompleted ? LevelProgress.totalGames : _firstIncomplete(completed);
+    final isCompleted = completed.length >= totalGames;
+    final nextGameIndex = isCompleted ? totalGames : _firstIncomplete(completed, totalGames);
     final totalScore = scores.values.fold<int>(0, (sum, value) => sum + value);
     final isCorrect = selectedAnswer == correctAnswer;
-    final unlockedGames = _buildUnlockedGames(nextGameIndex, isCompleted);
+    final unlockedGames = _buildUnlockedGames(
+      nextGameIndex: nextGameIndex,
+      isCompleted: isCompleted,
+      totalGames: totalGames,
+    );
 
     await ref.set({
-      'levelNumber': 1,
-      'currentLevel': 1,
+      'levelNumber': levelNumber,
+      'currentLevel': levelNumber,
       'currentGameIndex': nextGameIndex,
       'completedGameIndices': completed,
       'completedGames': completed,
@@ -97,7 +121,7 @@ class GameProgressService {
           'isCorrect': isCorrect,
           'scoreAwarded': score,
           'gameIndex': gameIndex,
-          'level': 1,
+          'level': levelNumber,
           'submittedAt': FieldValue.serverTimestamp(),
         },
       },
@@ -105,33 +129,53 @@ class GameProgressService {
       'totalScore': totalScore,
       'updatedAt': FieldValue.serverTimestamp(),
       'completedAt': isCompleted ? FieldValue.serverTimestamp() : null,
+      'totalGames': totalGames,
     }, SetOptions(merge: true));
 
     await _sessionsRef(childId).add({
-      'levelName': 'Level 1',
+      'levelName': 'Level $levelNumber',
+      'levelNumber': levelNumber,
       'gameId': gameKey,
       'gameTitle': gameTitle,
       'score': score,
       'totalQuestions': totalQuestions,
       'playedAt': FieldValue.serverTimestamp(),
     });
+
+    await _childRef(childId).set({
+      'currentLevel': levelNumber,
+      'currentGameIndex': nextGameIndex,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
-  List<int> _buildUnlockedGames(int nextGameIndex, bool isCompleted) {
+  Future<LevelProgress> ensureLevelOneProgress(String childId) {
+    return ensureLevelProgress(childId: childId, levelNumber: 1);
+  }
+
+  Future<LevelProgress> loadLevelOneProgress(String childId) {
+    return loadLevelProgress(childId: childId, levelNumber: 1);
+  }
+
+  List<int> _buildUnlockedGames({
+    required int nextGameIndex,
+    required bool isCompleted,
+    required int totalGames,
+  }) {
     if (isCompleted) {
-      return List<int>.generate(LevelProgress.totalGames, (index) => index);
+      return List<int>.generate(totalGames, (index) => index);
     }
 
-    final unlockedCount = (nextGameIndex + 1).clamp(1, LevelProgress.totalGames);
+    final unlockedCount = (nextGameIndex + 1).clamp(1, totalGames);
     return List<int>.generate(unlockedCount, (index) => index);
   }
 
-  int _firstIncomplete(List<int> completed) {
-    for (var index = 0; index < LevelProgress.totalGames; index++) {
+  int _firstIncomplete(List<int> completed, int totalGames) {
+    for (var index = 0; index < totalGames; index++) {
       if (!completed.contains(index)) {
         return index;
       }
     }
-    return LevelProgress.totalGames;
+    return totalGames;
   }
 }

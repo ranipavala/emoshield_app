@@ -39,6 +39,7 @@ class _ShapeMatchGameScreenState extends State<ShapeMatchGameScreen> {
 
     await _progressService.saveGameResult(
       childId: widget.childId,
+      levelNumber: 1,
       gameIndex: 0,
       gameKey: 'shape_match',
       selectedAnswer: _selectedAnswer!,
@@ -88,13 +89,6 @@ class _ShapeMatchGameScreenState extends State<ShapeMatchGameScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              boxShadow: const [
-                BoxShadow(
-                  blurRadius: 10,
-                  offset: Offset(0, 6),
-                  color: Color(0x22000000),
-                ),
-              ],
             ),
             child: Center(
               child: CustomPaint(
@@ -115,7 +109,6 @@ class _ShapeMatchGameScreenState extends State<ShapeMatchGameScreen> {
                 return Material(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(18),
-                  elevation: 4,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(18),
                     onTap: () => setState(() => _selectedAnswer = option),

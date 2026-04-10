@@ -40,6 +40,7 @@ class _AnimalGuessGameScreenState extends State<AnimalGuessGameScreen> {
 
     await _progressService.saveGameResult(
       childId: widget.childId,
+      levelNumber: 1,
       gameIndex: 1,
       gameKey: 'animal_guess',
       selectedAnswer: guess,
@@ -83,7 +84,7 @@ class _AnimalGuessGameScreenState extends State<AnimalGuessGameScreen> {
       finishEnabled: _canFinish,
       child: Column(
         children: [
-          const _FoxFace(),
+          const Icon(Icons.pets, size: 96, color: Color(0xFFF39B43)),
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -137,13 +138,6 @@ class _AnimalGuessGameScreenState extends State<AnimalGuessGameScreen> {
                   decoration: BoxDecoration(
                     color: isUsed ? const Color(0xFFEF4458) : Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [
-                      BoxShadow(
-                        blurRadius: 4,
-                        offset: Offset(0, 3),
-                        color: Color(0x22000000),
-                      ),
-                    ],
                   ),
                   alignment: Alignment.center,
                   child: Text(
@@ -158,61 +152,8 @@ class _AnimalGuessGameScreenState extends State<AnimalGuessGameScreen> {
               );
             }).toList(),
           ),
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              TextButton.icon(
-                onPressed: _pickedLetters.isEmpty
-                    ? null
-                    : () => setState(() => _pickedLetters.removeLast()),
-                icon: const Icon(Icons.backspace_outlined),
-                label: const Text(
-                  'Backspace',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                onPressed: _pickedLetters.isEmpty
-                    ? null
-                    : () => setState(() => _pickedLetters.clear()),
-                icon: const Icon(Icons.restart_alt),
-                label: const Text(
-                  'Reset',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
-    );
-  }
-}
-
-class _FoxFace extends StatelessWidget {
-  const _FoxFace();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const Icon(
-          Icons.pets,
-          size: 96,
-          color: Color(0xFFF39B43),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          width: 120,
-          height: 18,
-          decoration: BoxDecoration(
-            color: const Color(0xFFEAF7E9),
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ],
     );
   }
 }
