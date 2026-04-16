@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'screens/camera_test_screen.dart';
 import 'app/app_theme.dart';
 import 'firebase_options.dart';
+import 'screens/emotion_model_test_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,7 +22,7 @@ class EmoShieldApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'EmoShield',
       theme: AppTheme.light(),
-      home: const CameraTestScreen(),
+      home: const EmotionModelTestScreen(),
     );
   }
 }

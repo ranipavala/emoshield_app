@@ -39,6 +39,8 @@ dependencies:
   firebase_auth: ^5.2.0
   cloud_firestore: ^5.4.0
   camera: ^0.12.0+1
+  tflite_flutter: ^0.11.0
+  image: ^4.5.4
 
 dev_dependencies:
   flutter_test:
@@ -65,6 +67,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/models/emotion_model.tflite
 
   # To add assets to your application, add an assets section, like this:
   # assets:
