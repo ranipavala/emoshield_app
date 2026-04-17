@@ -1,47 +1,39 @@
 from pathlib import Path
-import tensorflow as tf
 
 DATA_DIR = Path("data/archive")
 TRAIN_DIR = DATA_DIR / "train"
 TEST_DIR = DATA_DIR / "test"
-
-IMG_SIZE = (48, 48)
-BATCH_SIZE = 32
-SEED = 42
+TARGET_CLASSES = ["angry", "happy", "neutral", "sad", "surprise"]
+REMOVED_CLASSES = ["disgust", "fear"]
 
 print("Checking dataset folders...")
 print("Train dir exists:", TRAIN_DIR.exists())
 print("Test dir exists:", TEST_DIR.exists())
+print()
 
-train_ds = tf.keras.utils.image_dataset_from_directory(
-    TRAIN_DIR,
-    labels="inferred",
-    label_mode="int",
-    color_mode="grayscale",
-    batch_size=BATCH_SIZE,
-    image_size=IMG_SIZE,
-    shuffle=True,
-    seed=SEED,
-)
+for split_name, split_dir in [("train", TRAIN_DIR), ("test", TEST_DIR)]:
+    print(f"[{split_name.upper()}]")
 
-test_ds = tf.keras.utils.image_dataset_from_directory(
-    TEST_DIR,
-    labels="inferred",
-    label_mode="int",
-    color_mode="grayscale",
-    batch_size=BATCH_SIZE,
-    image_size=IMG_SIZE,
-    shuffle=False,
-)
+    for class_name in TARGET_CLASSES:
+        class_dir = split_dir / class_name
+        if not class_dir.exists():
+            print(f"  MISSING: {class_dir}")
+            continue
 
-class_names = train_ds.class_names
-print("Class names:", class_names)
+        image_count = len(
+            [
+                p
+                for p in class_dir.glob("*")
+                if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+            ]
+        )
+        print(f"  {class_name:8s} -> {image_count} images")
 
-for images, labels in train_ds.take(1):
-    print("Image batch shape:", images.shape)
-    print("Label batch shape:", labels.shape)
-    print("Image dtype:", images.dtype)
-    print("Label dtype:", labels.dtype)
-    print("Sample labels:", labels[:10].numpy())
+    for removed_class in REMOVED_CLASSES:
+        removed_dir = split_dir / removed_class
+        print(f"  (ignored) {removed_class:8s} -> {'exists' if removed_dir.exists() else 'missing'}")
 
-print("Dataset loading check complete.")
+    print()
+
+print("Expected class order for 5-class model:", TARGET_CLASSES)
+print("Data check complete.")
