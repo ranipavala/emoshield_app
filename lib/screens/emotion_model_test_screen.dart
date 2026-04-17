@@ -17,7 +17,7 @@ class EmotionModelTestScreen extends StatefulWidget {
 
 class _EmotionModelTestScreenState extends State<EmotionModelTestScreen> {
   static const _modelAssetPath = 'assets/models/emotion_model.tflite';
-  static const _sampleImageAssetPath = 'assets/images/angrysample.jpg';
+  static const _sampleImageAssetPath = 'assets/images/happyme.jpg';
   static const _labels = [
     'angry',
     'happy',
@@ -78,7 +78,7 @@ class _EmotionModelTestScreenState extends State<EmotionModelTestScreen> {
 
       final faces = await _detectFaces(sampleBytes);
       if (faces.isEmpty) {
-        throw Exception('No face detected in angrysample.jpg.');
+        throw Exception('No face detected in happyme.jpg.');
       }
 
       final selectedFace = _selectLargestFace(faces);
