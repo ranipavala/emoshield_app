@@ -1,7 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../models/game_session.dart';
 import '../services/progress_report_service.dart';
 
 class ProgressReportScreen extends StatefulWidget {
@@ -20,13 +18,8 @@ class ProgressReportScreen extends StatefulWidget {
   State<ProgressReportScreen> createState() => _ProgressReportScreenState();
 }
 
-class _ProgressReportScreenState extends State<ProgressReportScreen>
-    with SingleTickerProviderStateMixin {
+class _ProgressReportScreenState extends State<ProgressReportScreen> {
   final ProgressReportService _service = const ProgressReportService();
-
-  late final AnimationController _entryController;
-  late final Animation<double> _fadeAnimation;
-  late final Animation<Offset> _slideAnimation;
 
   bool _loading = true;
   String? _error;
@@ -35,38 +28,15 @@ class _ProgressReportScreenState extends State<ProgressReportScreen>
   String? _selectedChildId;
   String _selectedChildName = 'Child';
 
-  Map<String, dynamic>? _levelProgress;
-  List<GameSession> _sessions = const [];
+  ChildProgressBundle? _bundle;
+  final Set<int> _expandedLevels = <int>{};
 
   @override
   void initState() {
     super.initState();
-
-    _entryController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    );
-
-    _fadeAnimation = CurvedAnimation(
-      parent: _entryController,
-      curve: Curves.easeOut,
-    );
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.05),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _entryController, curve: Curves.easeOutCubic));
-
     _selectedChildId = widget.childId;
     _selectedChildName = widget.childName ?? 'Child';
-
     _loadScreen();
-  }
-
-  @override
-  void dispose() {
-    _entryController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadScreen() async {
@@ -87,35 +57,29 @@ class _ProgressReportScreenState extends State<ProgressReportScreen>
       }
 
       if (_selectedChildId != null) {
-        await _loadChildData();
+        final bundle = await _service.loadChildProgressBundle(_selectedChildId!);
+        if (!mounted) return;
+        setState(() {
+          _bundle = bundle;
+        });
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _bundle = null;
+        });
       }
 
       if (!mounted) return;
       setState(() {
         _loading = false;
       });
-      _entryController.forward(from: 0);
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
         _error = 'Unable to load progress right now. Please try again.';
       });
     }
-  }
-
-  Future<void> _loadChildData() async {
-    final childId = _selectedChildId;
-    if (childId == null) return;
-
-    final progress = await _service.loadLevelProgress(childId);
-    final sessions = await _service.loadRecentSessions(childId);
-
-    if (!mounted) return;
-    setState(() {
-      _levelProgress = progress;
-      _sessions = sessions;
-    });
   }
 
   Future<void> _onChildChanged(String? childId) async {
@@ -127,7 +91,6 @@ class _ProgressReportScreenState extends State<ProgressReportScreen>
         (child) => child['id'] == childId,
         orElse: () => {'name': 'Child'},
       )['name']!;
-      _loading = true;
     });
 
     await _loadScreen();
@@ -143,7 +106,7 @@ class _ProgressReportScreenState extends State<ProgressReportScreen>
         backgroundColor: const Color(0xFFD7ECFF),
         elevation: 0,
         title: Text(
-          isChildView ? 'My Game Journey' : 'Progress Report',
+          isChildView ? 'My Progress Adventure' : 'Progress Report',
           style: const TextStyle(
             color: Colors.black87,
             fontWeight: FontWeight.w900,
@@ -152,43 +115,35 @@ class _ProgressReportScreenState extends State<ProgressReportScreen>
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : FadeTransition(
-              opacity: _fadeAnimation,
-              child: SlideTransition(
-                position: _slideAnimation,
-                child: RefreshIndicator(
-                  onRefresh: _loadScreen,
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
-                    children: [
-                      if (!isChildView) _parentChildSelector(),
-                      if (_selectedChildId == null)
-                        _funEmptyCard(
-                          icon: Icons.sentiment_dissatisfied,
-                          title: 'No Child Found',
-                          message: 'Add a child profile to start tracking progress.',
-                        )
-                      else ...[
-                        _heroProgressCard(isChildView: isChildView),
-                        const SizedBox(height: 12),
-                        _progressBadgeRow(),
-                        const SizedBox(height: 12),
-                        _sessionsCard(isChildView: isChildView),
-                      ],
-                      if (_error != null) ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          _error!,
-                          style: const TextStyle(
-                            color: Colors.redAccent,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+          : RefreshIndicator(
+              onRefresh: _loadScreen,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
+                children: [
+                  if (!isChildView) _parentChildSelector(),
+                  if (_selectedChildId == null)
+                    _emptyCard(
+                      icon: Icons.child_care,
+                      title: 'No Child Found',
+                      message: 'Add a child profile to see progress data.',
+                    )
+                  else ...[
+                    _summaryCard(isChildView: isChildView),
+                    const SizedBox(height: 12),
+                    _levelsSection(isChildView: isChildView),
+                  ],
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      _error!,
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
     );
@@ -198,7 +153,7 @@ class _ProgressReportScreenState extends State<ProgressReportScreen>
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
-      decoration: _whiteCardDecoration(),
+      decoration: _whiteCard(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -208,7 +163,7 @@ class _ProgressReportScreenState extends State<ProgressReportScreen>
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: _selectedChildId,
+            initialValue: _selectedChildId,
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
               isDense: true,
@@ -228,22 +183,27 @@ class _ProgressReportScreenState extends State<ProgressReportScreen>
     );
   }
 
-  Widget _heroProgressCard({required bool isChildView}) {
-    final currentLevel = (_levelProgress?['currentLevel'] ?? _levelProgress?['levelNumber'] ?? 1)
-        .toString();
-    final currentGameIndex = _toInt(_levelProgress?['currentGameIndex']);
+  Widget _summaryCard({required bool isChildView}) {
+    final bundle = _bundle;
+    if (bundle == null) {
+      return _emptyCard(
+        icon: Icons.info_outline,
+        title: 'No Progress Yet',
+        message: isChildView
+            ? 'Play your first game to start your learning journey!'
+            : 'No progress records available yet.',
+      );
+    }
 
-    final completedRaw = _levelProgress?['completedGames'] ?? _levelProgress?['completedGameIndices'];
-    final completedCount = completedRaw is List ? completedRaw.length : 0;
+    final subtitle = isChildView
+        ? 'Great job, $_selectedChildName! Keep going! 🌟'
+        : 'Performance summary for $_selectedChildName';
 
-    const totalGames = 3;
-    final progressFraction = (completedCount / totalGames).clamp(0.0, 1.0);
+    final progressFraction = bundle.totalLevels == 0
+        ? 0.0
+        : (bundle.completedLevels / bundle.totalLevels).clamp(0.0, 1.0);
 
-    final totalScore = _toInt(_levelProgress?['totalScore']);
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 450),
-      curve: Curves.easeOut,
+    return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -263,71 +223,41 @@ class _ProgressReportScreenState extends State<ProgressReportScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.emoji_events, color: Colors.amberAccent),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  isChildView
-                      ? 'Awesome, $_selectedChildName!'
-                      : 'Progress Overview',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
           Text(
-            isChildView
-                ? 'You are on Level $currentLevel and shining bright 🌟'
-                : 'Current Level: $currentLevel',
+            isChildView ? 'Your Level Journey' : 'Level Performance',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 20,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 12),
-          TweenAnimationBuilder<double>(
-            duration: const Duration(milliseconds: 700),
-            tween: Tween(begin: 0, end: progressFraction),
-            builder: (context, value, _) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(100),
-                    child: LinearProgressIndicator(
-                      minHeight: 12,
-                      value: value,
-                      color: const Color(0xFFFFD54F),
-                      backgroundColor: Colors.white24,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Completed $completedCount of $totalGames games',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              );
-            },
+          ClipRRect(
+            borderRadius: BorderRadius.circular(100),
+            child: LinearProgressIndicator(
+              minHeight: 12,
+              value: progressFraction,
+              color: const Color(0xFFFFD54F),
+              backgroundColor: Colors.white24,
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              _chip('Total Score: $totalScore'),
-              _chip('Next Game: ${currentGameIndex + 1}'),
-              _chip('Last Update: ${_formatTimestamp(_levelProgress?['updatedAt'])}'),
+              _chip('Completed Levels: ${bundle.completedLevels}/${bundle.totalLevels}'),
+              _chip('Total Score: ${bundle.totalScore}'),
+              _chip('Current Level: ${bundle.currentLevel}'),
+              _chip('Next Game Index: ${bundle.currentGameIndex + 1}'),
             ],
           ),
         ],
@@ -335,167 +265,267 @@ class _ProgressReportScreenState extends State<ProgressReportScreen>
     );
   }
 
-  Widget _progressBadgeRow() {
-    final unlockedRaw = _levelProgress?['unlockedGames'];
-    final unlockedCount = unlockedRaw is List ? unlockedRaw.length : 1;
+  Widget _levelsSection({required bool isChildView}) {
+    final bundle = _bundle;
+    if (bundle == null || bundle.levels.isEmpty) {
+      return _emptyCard(
+        icon: Icons.videogame_asset_outlined,
+        title: 'No Level Data',
+        message: isChildView
+            ? 'Play games to unlock your report cards!'
+            : 'No level progress docs found for this child.',
+      );
+    }
 
-    final completedRaw = _levelProgress?['completedGames'] ?? _levelProgress?['completedGameIndices'];
-    final completedCount = completedRaw is List ? completedRaw.length : 0;
-
-    final totalScore = _toInt(_levelProgress?['totalScore']);
-
-    return Row(
-      children: [
-        Expanded(child: _statBadge('⭐ Stars', '$totalScore')),
-        const SizedBox(width: 10),
-        Expanded(child: _statBadge('🔓 Unlocked', '$unlockedCount')),
-        const SizedBox(width: 10),
-        Expanded(child: _statBadge('✅ Done', '$completedCount')),
-      ],
-    );
-  }
-
-  Widget _sessionsCard({required bool isChildView}) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: _whiteCardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Column(
+      children: bundle.levels.map((level) {
+        final isExpanded = _expandedLevels.contains(level.levelNumber);
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: _whiteCard(),
+          child: Column(
             children: [
-              const Icon(Icons.auto_awesome, color: Color(0xFFF4A300)),
-              const SizedBox(width: 8),
-              Text(
-                isChildView ? 'My Play History' : 'Recent Game Sessions',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 350),
-            child: _sessions.isEmpty
-                ? _funEmptyCard(
-                    icon: Icons.videogame_asset_outlined,
-                    title: 'No Plays Yet',
-                    message: isChildView
-                        ? 'Play a game and your adventure history will appear here!'
-                        : 'No game sessions recorded for this child yet.',
-                  )
-                : Column(
-                    children: _sessions
-                        .map(
-                          (session) => Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFD9ECFF),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: const Icon(
-                                    Icons.sports_esports,
-                                    color: Color(0xFF2F86D6),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        session.gameTitle,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 15,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text('Level: ${session.levelName}'),
-                                      Text('Score: ${session.score}/${session.totalQuestions}'),
-                                      Text('Played: ${_formatDate(session.playedAt)}'),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFD54F),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    '${session.score}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                ),
-                              ],
+              InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () {
+                  setState(() {
+                    if (isExpanded) {
+                      _expandedLevels.remove(level.levelNumber);
+                    } else {
+                      _expandedLevels.add(level.levelNumber);
+                    }
+                  });
+                },
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: const Color(0xFFE8EEFF),
+                            child: Text(
+                              '${level.levelNumber}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF2F86D6),
+                              ),
                             ),
                           ),
-                        )
-                        .toList(),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Level ${level.levelNumber}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 17,
+                              ),
+                            ),
+                          ),
+                          _statusBadge(level.status),
+                          const SizedBox(width: 6),
+                          Icon(
+                            isExpanded ? Icons.expand_less : Icons.expand_more,
+                            color: const Color(0xFF2F86D6),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Score: ${level.score}/${level.totalGames}',
+                              style: const TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                          Text(
+                            '${level.completedCount}/${level.totalGames} done',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(100),
+                        child: LinearProgressIndicator(
+                          minHeight: 10,
+                          value: level.totalGames == 0
+                              ? 0
+                              : (level.completedCount / level.totalGames).clamp(0.0, 1.0),
+                          color: _statusColor(level.status),
+                          backgroundColor: const Color(0xFFE7ECF6),
+                        ),
+                      ),
+                    ],
                   ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statBadge(String label, String value) {
-    return TweenAnimationBuilder<double>(
-      duration: const Duration(milliseconds: 450),
-      tween: Tween(begin: 0.9, end: 1),
-      builder: (context, scale, child) {
-        return Transform.scale(scale: scale, child: child);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: const [
-            BoxShadow(
-              blurRadius: 7,
-              offset: Offset(0, 4),
-              color: Color(0x1A000000),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 18,
-                color: Color(0xFF2F86D6),
+                ),
               ),
+              if (isExpanded)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  child: _gameReviewPanel(
+                    isChildView: isChildView,
+                    games: level.gameReviews,
+                  ),
+                ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _gameReviewPanel({
+    required bool isChildView,
+    required List<GameReviewItem> games,
+  }) {
+    if (games.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF6F8FF),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(
+          isChildView
+              ? 'No games played in this level yet. You can do it! 💪'
+              : 'No game review data for this level yet.',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF6F8FF),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: games.map((game) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE6ECFA)),
             ),
-          ],
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  game.isCorrect ? Icons.check_circle : Icons.cancel,
+                  color: game.isCorrect ? const Color(0xFF2E7D32) : const Color(0xFFD32F2F),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        game.gameTitle,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isChildView
+                            ? 'Your answer: ${game.selectedAnswer}'
+                            : 'Selected answer: ${game.selectedAnswer}',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      if (!game.isCorrect)
+                        Text(
+                          isChildView
+                              ? 'Correct answer: ${game.correctAnswer} 💡'
+                              : 'Correct answer: ${game.correctAnswer}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF2F86D6),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: game.isCorrect
+                        ? const Color(0xFFE8F5E9)
+                        : const Color(0xFFFFEBEE),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    game.isCorrect ? 'Correct' : 'Try Again',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: game.isCorrect
+                          ? const Color(0xFF2E7D32)
+                          : const Color(0xFFD32F2F),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _statusBadge(LevelStatus status) {
+    String text;
+    switch (status) {
+      case LevelStatus.completed:
+        text = 'Completed';
+        break;
+      case LevelStatus.inProgress:
+        text = 'In Progress';
+        break;
+      case LevelStatus.locked:
+        text = 'Locked';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: _statusColor(status).withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          color: _statusColor(status),
         ),
       ),
     );
   }
 
-  Widget _funEmptyCard({
+  Color _statusColor(LevelStatus status) {
+    switch (status) {
+      case LevelStatus.completed:
+        return const Color(0xFF2E7D32);
+      case LevelStatus.inProgress:
+        return const Color(0xFF2F86D6);
+      case LevelStatus.locked:
+        return const Color(0xFF8E8E93);
+    }
+  }
+
+  Widget _emptyCard({
     required IconData icon,
     required String title,
     required String message,
@@ -510,13 +540,13 @@ class _ProgressReportScreenState extends State<ProgressReportScreen>
       ),
       child: Column(
         children: [
-          Icon(icon, size: 38, color: const Color(0xFFF4A300)),
+          Icon(icon, size: 36, color: const Color(0xFFF4A300)),
           const SizedBox(height: 8),
           Text(
             title,
             style: const TextStyle(
-              fontSize: 18,
               fontWeight: FontWeight.w900,
+              fontSize: 18,
               color: Color(0xFF8A4D00),
             ),
           ),
@@ -534,7 +564,7 @@ class _ProgressReportScreenState extends State<ProgressReportScreen>
     );
   }
 
-  BoxDecoration _whiteCardDecoration() {
+  BoxDecoration _whiteCard() {
     return BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(18),
@@ -564,27 +594,5 @@ class _ProgressReportScreenState extends State<ProgressReportScreen>
         ),
       ),
     );
-  }
-
-  int _toInt(dynamic value) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    return 0;
-  }
-
-  String _formatTimestamp(dynamic value) {
-    if (value is Timestamp) {
-      return _formatDate(value.toDate());
-    }
-    return 'N/A';
-  }
-
-  String _formatDate(DateTime? date) {
-    if (date == null) return 'N/A';
-    final month = date.month.toString().padLeft(2, '0');
-    final day = date.day.toString().padLeft(2, '0');
-    final hour = date.hour.toString().padLeft(2, '0');
-    final minute = date.minute.toString().padLeft(2, '0');
-    return '${date.year}-$month-$day $hour:$minute';
   }
 }
