@@ -37,6 +37,9 @@ class GameEmotionSessionService {
   String? _gameId;
   String? _gameTitle;
 
+  DateTime? _sessionStartedAt;
+  Duration _minimumCaptureDuration = const Duration(seconds: 6);
+
   final Map<String, int> _emotionCounts = <String, int>{
     for (final label in EmotionInferenceService.labels) label: 0,
   };
@@ -84,6 +87,7 @@ class GameEmotionSessionService {
     required String gameId,
     required String gameTitle,
     Duration samplingInterval = const Duration(seconds: 3),
+    Duration minCaptureDuration = const Duration(seconds: 6),
   }) async {
     if (_sessionId != null) {
       return EmotionSessionStartResult(
@@ -97,6 +101,8 @@ class GameEmotionSessionService {
     _levelNumber = levelNumber;
     _gameId = gameId;
     _gameTitle = gameTitle;
+    _minimumCaptureDuration = minCaptureDuration;
+    _sessionStartedAt = DateTime.now().toUtc();
 
     final sessionDoc = FirebaseFirestore.instance
         .collection('parents')
@@ -122,6 +128,8 @@ class GameEmotionSessionService {
       'playedAt': null,
       'endedAt': null,
       'emotionMonitoringStatus': 'starting',
+      'minimumCaptureDurationSec': _minimumCaptureDuration.inSeconds,
+      'captureWindowSatisfied': false,
     }, SetOptions(merge: true));
 
     String? warning;
@@ -129,12 +137,15 @@ class GameEmotionSessionService {
     try {
       await _inferenceService.initialize();
       await _initializeCamera();
+
       _samplingTimer = Timer.periodic(samplingInterval, (_) => _captureAndInfer());
       unawaited(_captureAndInfer());
 
       await _sessionRef().set({
         'emotionMonitoringStatus': 'active',
       }, SetOptions(merge: true));
+
+      warning = 'Keep your face in camera view for a few seconds.';
     } catch (error, stackTrace) {
       warning = 'Emotion monitoring is unavailable for this session.';
       debugPrint('Emotion monitor start failure: $error\n$stackTrace');
@@ -239,12 +250,25 @@ class GameEmotionSessionService {
     }
   }
 
+  Future<void> _ensureMinimumCaptureWindow() async {
+    final startedAt = _sessionStartedAt;
+    if (startedAt == null || _minimumCaptureDuration <= Duration.zero) return;
+
+    final elapsed = DateTime.now().toUtc().difference(startedAt);
+    final remaining = _minimumCaptureDuration - elapsed;
+    if (remaining <= Duration.zero) return;
+
+    // Keep capturing for the remaining window before finalizing.
+    await Future.delayed(remaining);
+  }
+
   Future<void> completeSession({
     required int score,
     required int totalQuestions,
   }) async {
     if (_sessionId == null) return;
 
+    await _ensureMinimumCaptureWindow();
     await _disposeCaptureResources();
 
     final summary = _buildSummary();
@@ -258,6 +282,7 @@ class GameEmotionSessionService {
         'endedAt': FieldValue.serverTimestamp(),
         'emotionReadingCount': _totalReadings,
         'emotionSummary': summary,
+        'captureWindowSatisfied': true,
       }, SetOptions(merge: true));
 
       await _emotionalReportsRef().doc(_sessionId).set({
@@ -300,6 +325,7 @@ class GameEmotionSessionService {
         'endedAt': FieldValue.serverTimestamp(),
         'emotionReadingCount': _totalReadings,
         'emotionSummary': summary,
+        'captureWindowSatisfied': false,
       }, SetOptions(merge: true));
     } catch (error, stackTrace) {
       debugPrint('Emotion session abandon write failed: $error\n$stackTrace');
@@ -370,8 +396,12 @@ class GameEmotionSessionService {
     _levelNumber = null;
     _gameId = null;
     _gameTitle = null;
+    _sessionStartedAt = null;
+    _minimumCaptureDuration = const Duration(seconds: 6);
+
     _totalReadings = 0;
     _consecutiveNoFaceDetections = 0;
+
     if (facePromptNotifier.value != null) {
       facePromptNotifier.value = null;
     }
