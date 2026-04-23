@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/game_emotion_session_service.dart';
 import '../services/game_progress_service.dart';
 import '../widgets/game_level_scaffold.dart';
 import 'animal_guess_game_screen.dart';
@@ -21,14 +22,35 @@ class ShapeMatchGameScreen extends StatefulWidget {
 
 class _ShapeMatchGameScreenState extends State<ShapeMatchGameScreen> {
   final _progressService = const GameProgressService();
+  final _emotionSessionService = GameEmotionSessionService();
 
   static const String _correctAnswer = 'Triangle';
   static const List<String> _options = ['Circle', 'Star', 'Triangle', 'Square'];
 
   String? _selectedAnswer;
   bool _isSaving = false;
+  bool _sessionFinalized = false;
+  String? _emotionNotice;
 
   bool get _hasAnswered => _selectedAnswer != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _startEmotionSession();
+  }
+
+  Future<void> _startEmotionSession() async {
+    final result = await _emotionSessionService.startSession(
+      childId: widget.childId,
+      levelNumber: 1,
+      gameId: 'shape_match',
+      gameTitle: 'Shape Match Game',
+    );
+
+    if (!mounted || result.warning == null) return;
+    setState(() => _emotionNotice = result.warning);
+  }
 
   Future<void> _finishGame() async {
     if (!_hasAnswered || _isSaving) return;
@@ -36,6 +58,13 @@ class _ShapeMatchGameScreenState extends State<ShapeMatchGameScreen> {
     setState(() => _isSaving = true);
 
     final score = _selectedAnswer == _correctAnswer ? 1 : 0;
+    final sessionId = _emotionSessionService.sessionId;
+
+    await _emotionSessionService.completeSession(
+      score: score,
+      totalQuestions: 1,
+    );
+    _sessionFinalized = true;
 
     await _progressService.saveGameResult(
       childId: widget.childId,
@@ -47,6 +76,8 @@ class _ShapeMatchGameScreenState extends State<ShapeMatchGameScreen> {
       score: score,
       gameTitle: 'Shape Match Game',
       totalQuestions: 1,
+      recordSession: false,
+      sessionId: sessionId,
     );
 
     if (!mounted) return;
@@ -61,7 +92,13 @@ class _ShapeMatchGameScreenState extends State<ShapeMatchGameScreen> {
     );
   }
 
-  void _goHome() {
+  Future<void> _goHome() async {
+    if (!_sessionFinalized) {
+      await _emotionSessionService.abandonSession();
+      _sessionFinalized = true;
+    }
+
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (_) => ChildHomeScreen(
@@ -74,76 +111,93 @@ class _ShapeMatchGameScreenState extends State<ShapeMatchGameScreen> {
   }
 
   @override
+  void dispose() {
+    if (!_sessionFinalized) {
+      _emotionSessionService.abandonSession();
+    }
+    _emotionSessionService.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return GameLevelScaffold(
-      question: 'Which name matches this shape?',
-      helperText: 'Tap one option, then press Finish.',
-      onBackPressed: _goHome,
-      onFinishPressed: _finishGame,
-      finishEnabled: _hasAnswered && !_isSaving,
-      child: Column(
-        children: [
-          Container(
-            width: 170,
-            height: 120,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Center(
-              child: CustomPaint(
-                size: const Size(80, 72),
-                painter: _TrianglePainter(const Color(0xFF8FE4E3)),
+    return WillPopScope(
+      onWillPop: () async {
+        await _goHome();
+        return false;
+      },
+      child: GameLevelScaffold(
+        question: 'Which name matches this shape?',
+        helperText: _emotionNotice == null
+            ? 'Tap one option, then press Finish.'
+            : 'Tap one option, then press Finish.\n$_emotionNotice',
+        onBackPressed: _goHome,
+        onFinishPressed: _finishGame,
+        finishEnabled: _hasAnswered && !_isSaving,
+        child: Column(
+          children: [
+            Container(
+              width: 170,
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Center(
+                child: CustomPaint(
+                  size: const Size(80, 72),
+                  painter: _TrianglePainter(const Color(0xFF8FE4E3)),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child: ListView.separated(
-              itemCount: _options.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final option = _options[index];
-                final isSelected = _selectedAnswer == option;
+            const SizedBox(height: 20),
+            Expanded(
+              child: ListView.separated(
+                itemCount: _options.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final option = _options[index];
+                  final isSelected = _selectedAnswer == option;
 
-                return Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  child: InkWell(
+                  return Material(
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
-                    onTap: () => setState(() => _selectedAnswer = option),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: isSelected ? const Color(0xFF2F86D6) : Colors.transparent,
-                          width: 3,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(18),
+                      onTap: () => setState(() => _selectedAnswer = option),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: isSelected ? const Color(0xFF2F86D6) : Colors.transparent,
+                            width: 3,
+                          ),
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              option,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 18,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                option,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 18,
+                                ),
                               ),
                             ),
-                          ),
-                          if (isSelected)
-                            const Icon(Icons.check_circle, color: Color(0xFF2F86D6)),
-                        ],
+                            if (isSelected)
+                              const Icon(Icons.check_circle, color: Color(0xFF2F86D6)),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
