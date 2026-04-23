@@ -73,7 +73,7 @@ class _ProgressReportScreenState extends State<ProgressReportScreen> {
       setState(() {
         _loading = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -257,7 +257,6 @@ class _ProgressReportScreenState extends State<ProgressReportScreen> {
               _chip('Completed Levels: ${bundle.completedLevels}/${bundle.totalLevels}'),
               _chip('Total Score: ${bundle.totalScore}'),
               _chip('Current Level: ${bundle.currentLevel}'),
-              _chip('Next Game Index: ${bundle.currentGameIndex + 1}'),
             ],
           ),
         ],
@@ -280,6 +279,7 @@ class _ProgressReportScreenState extends State<ProgressReportScreen> {
     return Column(
       children: bundle.levels.map((level) {
         final isExpanded = _expandedLevels.contains(level.levelNumber);
+
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: _whiteCard(),
@@ -297,7 +297,7 @@ class _ProgressReportScreenState extends State<ProgressReportScreen> {
                   });
                 },
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
                   child: Column(
                     children: [
                       Row(
@@ -332,23 +332,23 @@ class _ProgressReportScreenState extends State<ProgressReportScreen> {
                         ],
                       ),
                       const SizedBox(height: 10),
+
+                      // MAIN numeric indicator (kept): Score only.
                       Row(
                         children: [
                           Expanded(
                             child: Text(
                               'Score: ${level.score}/${level.totalGames}',
-                              style: const TextStyle(fontWeight: FontWeight.w800),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 15,
+                              ),
                             ),
                           ),
-                          Text(
-                            '${level.completedCount}/${level.totalGames} done',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: Colors.black54,
-                            ),
-                          ),
+                          _supportBadge(_supportLabel(level)),
                         ],
                       ),
+
                       const SizedBox(height: 8),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(100),
@@ -360,6 +360,25 @@ class _ProgressReportScreenState extends State<ProgressReportScreen> {
                           color: _statusColor(level.status),
                           backgroundColor: const Color(0xFFE7ECF6),
                         ),
+                      ),
+
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            isExpanded ? Icons.visibility : Icons.touch_app,
+                            size: 16,
+                            color: const Color(0xFF64748B),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            isExpanded ? 'Reviewing games below' : 'Tap to review games',
+                            style: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -377,6 +396,37 @@ class _ProgressReportScreenState extends State<ProgressReportScreen> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  String _supportLabel(LevelReviewData level) {
+    if (level.status == LevelStatus.locked) return 'Not Started';
+    if (level.status == LevelStatus.inProgress) {
+      if (level.completedCount == 0) return 'Ready to Continue';
+      return 'In Progress';
+    }
+
+    // Completed
+    final ratio = level.totalGames == 0 ? 0 : level.score / level.totalGames;
+    if (ratio >= 1.0) return 'Perfect Score';
+    if (ratio >= 0.67) return 'Great Job';
+    return 'Needs Practice';
+  }
+
+  Widget _supportBadge(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontWeight: FontWeight.w800,
+          color: Color(0xFF2F86D6),
+        ),
+      ),
     );
   }
 
