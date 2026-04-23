@@ -76,6 +76,14 @@ class _ParentProfileDashboardScreenState extends State<ParentProfileDashboardScr
     );
   }
 
+  void _switchProfile() {
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      AppRouter.profileSelect,
+      (route) => false,
+    );
+  }
+
   Future<void> _showEditProfileDialog() async {
     final uid = _uid;
     final user = _user;
@@ -124,7 +132,7 @@ class _ParentProfileDashboardScreenState extends State<ParentProfileDashboardScr
                   await user.updateEmail(newEmail);
                 }
 
-                // Update parent profile doc (mobile intentionally untouched/read-only).
+                // Update Firestore profile; phone remains non-editable.
                 await _parentRef(uid).set({
                   'fullName': newFullName,
                   'email': newEmail,
@@ -149,6 +157,7 @@ class _ParentProfileDashboardScreenState extends State<ParentProfileDashboardScr
                 } else if (e.code == 'invalid-email') {
                   message = 'Invalid email format.';
                 }
+
                 setLocalState(() {
                   saving = false;
                   dialogError = message;
@@ -359,7 +368,7 @@ class _ParentProfileDashboardScreenState extends State<ParentProfileDashboardScr
     required VoidCallback? onTap,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 12),
       child: SizedBox(
         width: double.infinity,
         height: 62,
@@ -400,29 +409,26 @@ class _ParentProfileDashboardScreenState extends State<ParentProfileDashboardScr
     );
   }
 
-  Widget _homeButton() {
-    return Container(
-      margin: const EdgeInsets.only(top: 2, bottom: 12),
-      child: SizedBox(
-        width: double.infinity,
-        height: 58,
-        child: ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF2F86D6),
-            elevation: 5,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+  Widget _homeBottomButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 58,
+      child: ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF2F86D6),
+          elevation: 6,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-          onPressed: _goBackHome,
-          icon: const Icon(Icons.home_filled, color: Colors.white),
-          label: const Text(
-            'Back to Homepage',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-            ),
+        ),
+        onPressed: _goBackHome,
+        icon: const Icon(Icons.home_filled, color: Colors.white),
+        label: const Text(
+          'Back to Homepage',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
           ),
         ),
       ),
@@ -490,7 +496,7 @@ class _ParentProfileDashboardScreenState extends State<ParentProfileDashboardScr
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 18),
                     if (_error != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
@@ -517,12 +523,19 @@ class _ParentProfileDashboardScreenState extends State<ParentProfileDashboardScr
                       label: 'Manage Children',
                       onTap: _openChildrenManagement,
                     ),
-                    _homeButton(),
+                    _dashboardButton(
+                      iconPath: 'assets/images/profile dash_children.svg',
+                      label: 'Switch Profile',
+                      onTap: _switchProfile,
+                    ),
                     _dashboardButton(
                       iconPath: 'assets/images/profile dash_log out.svg',
                       label: 'Log Out',
                       onTap: () => _logout(context),
                     ),
+                    const Spacer(),
+                    // Homepage action intentionally bottom-most.
+                    _homeBottomButton(),
                   ],
                 ),
               ),
@@ -797,7 +810,6 @@ class _ChildManagementScreen extends StatelessWidget {
     try {
       final childRef = childDoc.reference;
 
-      // Delete nested subcollections safely
       await _deleteCollection(childRef.collection('gameProgress'));
 
       final gameSessionsRef = childRef.collection('gameSessions');
@@ -808,8 +820,6 @@ class _ChildManagementScreen extends StatelessWidget {
       }
 
       await _deleteCollection(childRef.collection('emotionalReports'));
-
-      // Finally delete child doc
       await childRef.delete();
 
       if (!context.mounted) return;
