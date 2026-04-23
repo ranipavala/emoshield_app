@@ -52,12 +52,22 @@ class LevelResultScreen extends StatelessWidget {
 
             final progress = snapshot.data!;
             final gameLabels = <String, String>{
+              // Level 1
               'shape_match': 'Shape Match',
               'animal_guess': 'Animal Guess',
               'pattern_recognition': 'Pattern Recognition',
+
+              // Level 2
               'memory_sequence': 'Memory Sequence',
               'category_sorting': 'Category Sorting',
               'picture_logic': 'Picture Logic',
+
+              // Level 3 (new)
+              'logic_grid_match': 'Logic Grid Match',
+              'sequence_builder': 'Sequence Builder',
+              'smart_analogy': 'Smart Analogy Challenge',
+
+              // Legacy keys (keep compatibility)
               'number_pattern': 'Number Pattern',
               'analogy_match': 'Analogy Match',
               'matrix_reasoning': 'Matrix Reasoning',

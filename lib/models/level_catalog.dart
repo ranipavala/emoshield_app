@@ -38,19 +38,19 @@ class LevelCatalog {
     ],
     3: [
       GameMeta(
-        gameKey: 'number_pattern',
-        gameTitle: 'Number Pattern Game',
-        routeKey: 'l3_number_pattern',
+        gameKey: 'logic_grid_match',
+        gameTitle: 'Logic Grid Match Game',
+        routeKey: 'l3_logic_grid',
       ),
       GameMeta(
-        gameKey: 'analogy_match',
-        gameTitle: 'Analogy Match Game',
-        routeKey: 'l3_analogy',
+        gameKey: 'sequence_builder',
+        gameTitle: 'Sequence Builder Game',
+        routeKey: 'l3_sequence_builder',
       ),
       GameMeta(
-        gameKey: 'matrix_reasoning',
-        gameTitle: 'Matrix Reasoning Game',
-        routeKey: 'l3_matrix',
+        gameKey: 'smart_analogy',
+        gameTitle: 'Smart Analogy Challenge',
+        routeKey: 'l3_smart_analogy',
       ),
     ],
   };
