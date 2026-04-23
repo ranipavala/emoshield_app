@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+
 import '../app/app_router.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -27,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_isLoading) return;
 
     final email = emailController.text.trim();
-    final password = passController.text.trim();
+    final password = passController.text; // keep raw password to avoid accidental credential mutation
 
     if (email.isEmpty || password.isEmpty) {
       setState(() => _errorText = 'Please enter email and password.');
@@ -48,15 +49,45 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, AppRouter.profileSelect);
     } on FirebaseAuthException catch (e) {
-      String msg = 'Login failed.';
-      if (e.code == 'user-not-found') msg = 'No account found for this email.';
-      if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
-        msg = 'Incorrect email or password.';
+      debugPrint('[Login] FirebaseAuthException code=${e.code}, message=${e.message}');
+
+      String msg;
+      switch (e.code) {
+        case 'user-not-found':
+          msg = 'No account found for this email.';
+          break;
+        case 'wrong-password':
+        case 'invalid-credential':
+        case 'invalid-login-credentials':
+          msg = 'Incorrect email or password.';
+          break;
+        case 'invalid-email':
+          msg = 'Please enter a valid email.';
+          break;
+        case 'too-many-requests':
+          msg = 'Too many attempts. Please try again later.';
+          break;
+        case 'user-disabled':
+          msg = 'This account has been disabled.';
+          break;
+        case 'network-request-failed':
+          msg = 'Network error. Check your connection and try again.';
+          break;
+        case 'operation-not-allowed':
+          msg = 'Email/password sign-in is not enabled in Firebase.';
+          break;
+        default:
+          msg = e.message?.trim().isNotEmpty == true
+              ? e.message!.trim()
+              : 'Login failed.';
       }
-      if (e.code == 'invalid-email') msg = 'Please enter a valid email.';
-      setState(() => _errorText = msg);
-    } catch (_) {
-      setState(() => _errorText = 'Something went wrong. Please try again.');
+
+      if (mounted) setState(() => _errorText = msg);
+    } catch (e) {
+      debugPrint('[Login] Unknown error: $e');
+      if (mounted) {
+        setState(() => _errorText = 'Something went wrong. Please try again.');
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -69,7 +100,6 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Stack(
           children: [
             Container(color: const Color(0xFFD7ECFF)),
-
             Positioned(
               top: 18,
               left: 0,
@@ -78,7 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Image.asset(
                   'assets/images/emoshield_logo.png',
                   height: 54,
-                  errorBuilder: (_, __, _) {
+                  errorBuilder: (_, __, ___) {
                     return const Text(
                       'EmoShield',
                       style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
@@ -87,7 +117,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-
             Align(
               alignment: Alignment.bottomCenter,
               child: Container(
@@ -112,7 +141,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 18),
-
                     const _Label('Username Or Email'),
                     const SizedBox(height: 8),
                     TextField(
@@ -122,7 +150,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-
                     const _Label('Password'),
                     const SizedBox(height: 8),
                     TextField(
@@ -134,7 +161,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-
                     if (_errorText != null) ...[
                       Text(
                         _errorText!,
@@ -145,7 +171,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 10),
                     ],
-
                     SizedBox(
                       width: 180,
                       height: 46,
@@ -160,9 +185,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Text(_isLoading ? 'Logging In...' : 'Log In'),
                       ),
                     ),
-
                     const SizedBox(height: 10),
-
                     TextButton(
                       onPressed: () {},
                       child: const Text(
@@ -170,9 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: TextStyle(color: Colors.white),
                       ),
                     ),
-
                     const SizedBox(height: 6),
-
                     GestureDetector(
                       onTap: () {
                         Navigator.pushNamed(context, AppRouter.parentSignup);
