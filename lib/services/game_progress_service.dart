@@ -86,6 +86,8 @@ class GameProgressService {
     required int score,
     required String gameTitle,
     required int totalQuestions,
+    bool recordSession = true,
+    String? sessionId,
   }) async {
     final totalGames = LevelCatalog.totalGames(levelNumber);
     final ref = _levelRef(childId: childId, levelNumber: levelNumber);
@@ -97,7 +99,8 @@ class GameProgressService {
     final completed = {...current.completedGameIndices, gameIndex}.toList()..sort();
     final scores = Map<String, int>.from(current.gameScores)..[gameKey] = score;
     final isCompleted = completed.length >= totalGames;
-    final nextGameIndex = isCompleted ? totalGames : _firstIncomplete(completed, totalGames);
+    final nextGameIndex =
+        isCompleted ? totalGames : _firstIncomplete(completed, totalGames);
     final totalScore = scores.values.fold<int>(0, (sum, value) => sum + value);
     final isCorrect = selectedAnswer == correctAnswer;
     final unlockedGames = _buildUnlockedGames(
@@ -123,6 +126,7 @@ class GameProgressService {
           'gameIndex': gameIndex,
           'level': levelNumber,
           'submittedAt': FieldValue.serverTimestamp(),
+          'sessionId': sessionId,
         },
       },
       'isCompleted': isCompleted,
@@ -132,15 +136,24 @@ class GameProgressService {
       'totalGames': totalGames,
     }, SetOptions(merge: true));
 
-    await _sessionsRef(childId).add({
-      'levelName': 'Level $levelNumber',
-      'levelNumber': levelNumber,
-      'gameId': gameKey,
-      'gameTitle': gameTitle,
-      'score': score,
-      'totalQuestions': totalQuestions,
-      'playedAt': FieldValue.serverTimestamp(),
-    });
+    if (recordSession) {
+      await _sessionsRef(childId).add({
+        'levelName': 'Level $levelNumber',
+        'levelNumber': levelNumber,
+        'gameId': gameKey,
+        'gameTitle': gameTitle,
+        'score': score,
+        'totalQuestions': totalQuestions,
+        'playedAt': FieldValue.serverTimestamp(),
+        'sessionId': sessionId,
+      });
+    } else if (sessionId != null) {
+      await _sessionsRef(childId).doc(sessionId).set({
+        'score': score,
+        'totalQuestions': totalQuestions,
+        'playedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
 
     await _childRef(childId).set({
       'currentLevel': levelNumber,

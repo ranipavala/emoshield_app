@@ -31,13 +31,20 @@ class _ShapeMatchGameScreenState extends State<ShapeMatchGameScreen> {
   bool _isSaving = false;
   bool _sessionFinalized = false;
   String? _emotionNotice;
+  String? _cameraPrompt;
 
   bool get _hasAnswered => _selectedAnswer != null;
 
   @override
   void initState() {
     super.initState();
+    _emotionSessionService.facePromptNotifier.addListener(_onFacePromptChanged);
     _startEmotionSession();
+  }
+
+  void _onFacePromptChanged() {
+    if (!mounted) return;
+    setState(() => _cameraPrompt = _emotionSessionService.facePromptNotifier.value);
   }
 
   Future<void> _startEmotionSession() async {
@@ -110,11 +117,24 @@ class _ShapeMatchGameScreenState extends State<ShapeMatchGameScreen> {
     );
   }
 
+
+  String _buildHelperText(String base) {
+    final parts = <String>[base];
+    if (_emotionNotice != null && _emotionNotice!.isNotEmpty) {
+      parts.add(_emotionNotice!);
+    }
+    if (_cameraPrompt != null && _cameraPrompt!.isNotEmpty) {
+      parts.add(_cameraPrompt!);
+    }
+    return parts.join('\n');
+  }
+
   @override
   void dispose() {
     if (!_sessionFinalized) {
       _emotionSessionService.abandonSession();
     }
+    _emotionSessionService.facePromptNotifier.removeListener(_onFacePromptChanged);
     _emotionSessionService.dispose();
     super.dispose();
   }
@@ -128,9 +148,7 @@ class _ShapeMatchGameScreenState extends State<ShapeMatchGameScreen> {
       },
       child: GameLevelScaffold(
         question: 'Which name matches this shape?',
-        helperText: _emotionNotice == null
-            ? 'Tap one option, then press Finish.'
-            : 'Tap one option, then press Finish.\n$_emotionNotice',
+        helperText: _buildHelperText('Tap one option, then press Finish.'),
         onBackPressed: _goHome,
         onFinishPressed: _finishGame,
         finishEnabled: _hasAnswered && !_isSaving,

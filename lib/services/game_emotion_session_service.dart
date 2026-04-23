@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -26,6 +27,7 @@ class GameEmotionSessionService {
   final EmotionInferenceService _inferenceService;
 
   CameraController? _cameraController;
+  bool _isFrontCamera = true;
   Timer? _samplingTimer;
   bool _isSampling = false;
 
@@ -38,7 +40,14 @@ class GameEmotionSessionService {
   final Map<String, int> _emotionCounts = <String, int>{
     for (final label in EmotionInferenceService.labels) label: 0,
   };
+  final Map<String, double> _emotionConfidenceTotals = <String, double>{
+    for (final label in EmotionInferenceService.labels) label: 0,
+  };
+
   int _totalReadings = 0;
+  int _consecutiveNoFaceDetections = 0;
+
+  final ValueNotifier<String?> facePromptNotifier = ValueNotifier<String?>(null);
 
   String? get sessionId => _sessionId;
 
@@ -74,7 +83,7 @@ class GameEmotionSessionService {
     required int levelNumber,
     required String gameId,
     required String gameTitle,
-    Duration samplingInterval = const Duration(seconds: 9),
+    Duration samplingInterval = const Duration(seconds: 3),
   }) async {
     if (_sessionId != null) {
       return EmotionSessionStartResult(
@@ -121,6 +130,7 @@ class GameEmotionSessionService {
       await _inferenceService.initialize();
       await _initializeCamera();
       _samplingTimer = Timer.periodic(samplingInterval, (_) => _captureAndInfer());
+      unawaited(_captureAndInfer());
 
       await _sessionRef().set({
         'emotionMonitoringStatus': 'active',
@@ -152,6 +162,8 @@ class GameEmotionSessionService {
       orElse: () => cameras.first,
     );
 
+    _isFrontCamera = selectedCamera.lensDirection == CameraLensDirection.front;
+
     _cameraController = CameraController(
       selectedCamera,
       ResolutionPreset.low,
@@ -171,14 +183,32 @@ class GameEmotionSessionService {
 
     try {
       final captured = await controller.takePicture();
-      final result = await _inferenceService.inferFromImagePath(captured.path);
+      final bytes = await File(captured.path).readAsBytes();
+
+      final result = await _inferenceService.inferFromCapturedImage(
+        imagePath: captured.path,
+        jpegBytes: bytes,
+        tryMirroredVariant: _isFrontCamera,
+      );
 
       if (result == null) {
+        _consecutiveNoFaceDetections += 1;
+        if (_consecutiveNoFaceDetections >= 2) {
+          facePromptNotifier.value =
+              'Face not detected. Please angle the camera properly.';
+        }
         return;
+      }
+
+      _consecutiveNoFaceDetections = 0;
+      if (facePromptNotifier.value != null) {
+        facePromptNotifier.value = null;
       }
 
       _totalReadings += 1;
       _emotionCounts[result.emotionLabel] = (_emotionCounts[result.emotionLabel] ?? 0) + 1;
+      _emotionConfidenceTotals[result.emotionLabel] =
+          (_emotionConfidenceTotals[result.emotionLabel] ?? 0) + result.confidenceScore;
 
       await _sessionRef().collection('emotionReadings').add({
         'sessionId': _sessionId,
@@ -290,12 +320,21 @@ class GameEmotionSessionService {
       };
     }
 
+    final confidenceTotal = _emotionConfidenceTotals.values.fold<double>(
+      0,
+      (sum, value) => sum + value,
+    );
+
     int percent(String emotion) {
-      final count = _emotionCounts[emotion] ?? 0;
-      return ((count / _totalReadings) * 100).round();
+      if (confidenceTotal <= 0) {
+        final count = _emotionCounts[emotion] ?? 0;
+        return ((count / _totalReadings) * 100).round();
+      }
+      final score = _emotionConfidenceTotals[emotion] ?? 0;
+      return ((score / confidenceTotal) * 100).round();
     }
 
-    final ranking = _emotionCounts.entries.toList()
+    final ranking = _emotionConfidenceTotals.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
     return {
@@ -322,6 +361,7 @@ class GameEmotionSessionService {
     await _disposeCaptureResources();
     _inferenceService.dispose();
     _resetSessionState();
+    facePromptNotifier.dispose();
   }
 
   void _resetSessionState() {
@@ -331,8 +371,16 @@ class GameEmotionSessionService {
     _gameId = null;
     _gameTitle = null;
     _totalReadings = 0;
+    _consecutiveNoFaceDetections = 0;
+    if (facePromptNotifier.value != null) {
+      facePromptNotifier.value = null;
+    }
 
     _emotionCounts
+      ..clear()
+      ..addAll({for (final label in EmotionInferenceService.labels) label: 0});
+
+    _emotionConfidenceTotals
       ..clear()
       ..addAll({for (final label in EmotionInferenceService.labels) label: 0});
   }
